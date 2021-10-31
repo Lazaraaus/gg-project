@@ -1,31 +1,23 @@
 import json
-import pandas as pd
 import re
+import time
 
 from collections import Counter
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
+
+STOP_WORDS = ['than', "isn't", 'weren', 'have', 'what', 'the', 'they', 'more', 'doesn', "mightn't", 'them', 'itself', 'own', 'or', 'you', 'theirs', 'before', 'how', 'were', 'does', 'ma', 'he', 'same', 'each', 'doing', 'at', 'couldn', "needn't", 'but', "weren't", 'only', 'over', 'again', 'any', 'now', 'here', 'no', 'mustn', 're', 'nor', 'so', "she's", 'above', 'against', "didn't", 'myself', 'an', 'ain', 'shouldn', 'where', 'their', 'won', 'yours', 'himself', 'further', 'i', 'this', 'didn', 'these', 'herself', 'both', 'her', 'aren', 'its', 'other', "wouldn't", "shan't", 'all', 'in', 'do', 'with', 'up', 'there', 'our', 'needn', 'such', 'while', 'too', "hasn't", "don't", 'below', 'ourselves', 'to', 've', "couldn't", 'because', 'down', "doesn't", 'is', 'if', 'wouldn', "aren't", 'who', "haven't", 'being', 'then', 'very', "should've", 'should', 'that', 'few', 'hadn', 'under', 'hasn', 'as', 'off', "won't", 'not', 'm', 'hers', 'a', "you've", 'him', 'yourself', 'she', 'on', 't', "hadn't", 'shan', 'of', 'about', 'it', "you're", 'why', 'are', 'through', 'between', 'having', 'whom', 'until', 'and', 'your', 'those', 'me', 'o', 's', 'ours', 'y', 'will', 'my', 'into', 'themselves', 'did', 'be', 'wasn', 'd', 'yourselves', "shouldn't", 'when', 'during', 'isn', "you'd", "wasn't", 'am', "it's", 'by', 'haven', 'been', 'can', "you'll", 'had', 'from', 'most', "that'll", 'don', 'out', 'for', 'after', 'some', 'we', 'his', 'once', 'has', 'was', 'mightn', 'just', 'll', "mustn't", 'which']
 
 def remove_punc(words):
     new_words = []
     for word in words:
         if word[0] == "#":
             continue
-        if len(word) >= 4 and word[:4] == "http":
+        if len(word) >= 3 and word[:3] == "htt":
             continue
         new_word = re.sub(r'[^\w\s]', '', (word))
         if new_word != '':
-            new_words.append(new_word)
-    return new_words, words
-
-
-def remove_punc2(words):
-    new_words = []
-    for word in words:
-        new_word = word.replace(",", " -")
-        for c in new_word:
-            if not c.isalnum() and c != "-":
-                new_word = new_word.replace(c, "")
-        if new_word:
             new_words.append(new_word)
     return new_words
 
@@ -39,28 +31,18 @@ def get_data(year):
     return tweets_lst
 
 
-def verb_prefix(verbs, tweet):
-    split_verbs = verbs.split()
-    n = len(split_verbs)
-    indices = [i for (i, w) in enumerate(tweet) if tweet[i:i + n] == split_verbs]
-    return tweet[indices[-1] + n:] if indices else None
+def verb_prefix(tweet):
+    tweet_lsts = []
+    for verbs in verb_prefixes:
+        split_verbs = verbs.split()
+        n = len(split_verbs)
+        indices = [i for (i, w) in enumerate(tweet) if tweet[i:i + n] == split_verbs]
+        if indices:
+            tweet_lsts.append((tweet[indices[-1] + n:], verb_prefixes[verbs]))
+    return tweet_lsts
 
 
-def verb_suffix(verbs, tweet):
-    split_verbs = verbs.split()
-    n = len(split_verbs)
-    indices = [i for (i, w) in enumerate(tweet) if tweet[i:i + n] == split_verbs]
-    best_index = 0
-    if "best" in tweet:
-        best_index = tweet.index("best")
-    return tweet[best_index:indices[0]] if indices else None
-
-
-verb_suffix_ratings = {
-    "goes to": 10
-}
-
-verb_prefix_ratings = {
+verb_prefixes = {
     "wins": 10,
     "win": 5,
     "winning": 3,
@@ -73,316 +55,287 @@ verb_prefix_ratings = {
     "will present": 5,
     "is nominated for": 3,
     "presents": 3,
-    "nominated for": 3
+    "nominated for": 3,
+    "to win": 5
 }
 
 
+def tweet_lst_to_candidate(cand, val):
+    og_cand = cand
+    if cand and (cand[0] == "the" or cand[0] == "a" or cand[0] == "an"):
+        cand = cand[1:]
+    if len(cand) >= 1 and cand[0] in ("goldenglobe", "goldenglobes"):
+        cand = cand[1:]
+    if len(cand) >= 2 and cand[0:2] in (["golden", "globe"], ["golden", "globes"]):
+        cand = cand[2:]
+    if cand and cand[0] == "for":
+        cand = cand[1:]
+        val += 5
+    if cand and cand[0] == "best ":
+        val += 200
+    if cand and cand[0] == "at":
+        cand = cand[1:]
+    if "as" in cand:
+        ind = cand.index("as")
+        cand = cand[:ind]
+        val += 5
+    if "with" in cand:
+        ind = cand.index("with")
+        cand = cand[:ind]
+        val += 5
+    if "at" in cand:
+        ind = cand.index("at")
+        cand = cand[:ind]
+        val += 5
+    if "for" in cand:
+        ind = cand.index("for")
+        cand = cand[:ind]
+        val += 5
+    if "from" in cand:
+        ind = cand.index("from")
+        cand = cand[:ind]
+    if "award" in cand:
+        ind = cand.index("award")
+        cand = cand[:ind]
+    return cand, val
+
 def count_scripts():
-    tweets = get_data(2013) + get_data(2015)
+    tweets = get_data(2015)
     candidates = {}
-    for clean_tweet, old_tweet in tweets:
-        for verbs in verb_prefix_ratings:
-            val = verb_prefix_ratings[verbs]
-            cand = verb_prefix(verbs, clean_tweet)
-            if cand:
-                if cand and cand[0] == "the" or cand[0] == "a":
-                    cand = cand[1:]
-                if len(cand) >= 2 and cand[0:2] == ["golden", "globes"]:
-                    cand = cand[2:]
-                if len(cand) >= 2 and cand[0:2] == ["golden", "globe"]:
-                    cand = cand[2:]
-                if cand and cand[0] == "for":
-                    cand = cand[1:]
-                    val += 5
-                if cand and cand[0] == "best ":
-                    val += 100
-                if cand and cand[0] == "at":
-                    cand = cand[1:]
-                if "at" in cand:
-                    ind = cand.index("at")
-                    cand = cand[:ind]
-                    val += 5
-                if "for" in cand:
-                    ind = cand.index("for")
-                    cand = cand[:ind]
-                    val += 5
-                try:
-                    ind_start = old_tweet.index(cand[0])
-                    ind_end = old_tweet.index(cand[-1])
-                    cand = remove_punc2(old_tweet[ind_start:ind_end + 1])
-                except:
-                    pass
-                if "-" in cand:
-                    val += 50
+    for tweet in tweets:
+        tweet_sublists = verb_prefix(tweet)
+        for tweet_sublist, val in tweet_sublists:
+            tweet_sublists2 = verb_prefix(tweet_sublist)
+            if tweet_sublists2:
+                tweet_sublists.extend(tweet_sublists2)
+            else:
+                cand, val = tweet_lst_to_candidate(tweet_sublist, val)
                 n = len(cand)
                 cand = " ".join(cand)
-                if n <= 1:
-                    continue
-                else:
-                    val += 5 * n
+                val += 5 * n
                 if cand in candidates:
                     candidates[cand] += val
                 else:
                     candidates[cand] = val
-        for verbs in verb_suffix_ratings:
-            val = verb_suffix_ratings[verbs]
-            cand = verb_suffix(verbs, clean_tweet)
-            if cand:
-                if cand and cand[0] == "the" or cand[0] == "a":
-                    cand = cand[1:]
-                if len(cand) >= 2 and cand[0:2] == ["golden", "globes"]:
-                    cand = cand[2:]
-                if len(cand) >= 2 and cand[0:2] == ["golden", "globe"]:
-                    cand = cand[2:]
-                if cand and cand[0] == "for":
-                    cand = cand[1:]
-                    val += 5
-                if cand and cand[0] == "best ":
-                    val += 100
-                if cand and cand[0] == "at":
-                    cand = cand[1:]
-                if "at" in cand:
-                    ind = cand.index("at")
-                    cand = cand[:ind]
-                    val += 5
-                if "for" in cand:
-                    ind = cand.index("for")
-                    cand = cand[:ind]
-                    val += 5
-                try:
-                    ind_start = old_tweet.index(cand[0])
-                    ind_end = old_tweet.index(cand[-1])
-                    cand = remove_punc2(old_tweet[ind_start:ind_end + 1])
-                except:
-                    pass
-                if "-" in cand:
-                    val += 50
-                n = len(cand)
-                cand = " ".join(cand)
-                if n <= 1:
-                    continue
-                else:
-                    val += 5 * n
-                if cand in candidates:
-                    candidates[cand] += val
-                else:
-                    candidates[cand] = val
-    return [x[0] for x in list(sorted(candidates.items(), key=lambda i: i[1], reverse=True)[:50])]
+    candidates = {x[0]: x[1] for x in list(sorted(candidates.items(), key=lambda i: i[1], reverse=True))}
+    candidates_lst = list(candidates.keys())
+    max_val = candidates[candidates_lst[0]]
+    candidates = {k: v for (k, v) in candidates.items() if v > (max_val / 100)}
+    cands_to_del = set()
+    for i in range(len(candidates)):
+        cand_i = candidates_lst[i]
+        for j in range(len(candidates)):
+            if i < j:
+                cand_j = candidates_lst[j]
+                n_i, n_j = len(cand_i.strip().split()), len(cand_j.strip().split())
+                if fuzz.token_sort_ratio(cand_i, cand_j) >= 97 or fuzz.token_set_ratio(candidates_lst[i], candidates_lst[j]) >= 95:
+                    if cands_to_del and n_i >= 4 and candidates[cand_i] > candidates[cand_j]:
+                        candidates[cand_i] += candidates[cand_j]
+                        cands_to_del.add(cand_j)
+                    elif n_j >= 4 and candidates[cand_j] > candidates[cand_i]:
+                        candidates[cand_j] += candidates[cand_i]
+                        cands_to_del.add(cand_i)
+                    else:
+                        if n_i > n_j:
+                            candidates[cand_i] += candidates[cand_j] // 2
+                            cands_to_del.add(cand_j)
+                        else:
+                            candidates[cand_j] += candidates[cand_i] // 2
+                            cands_to_del.add(cand_i)
+        if n_i < 4 or "golden globe" in cand_i or "golden globes" in cand_i or "award" in cand_i or "awards" in cand_i or "gg" in cand_i:
+            cands_to_del.add(cand_i)
+    for cand in cands_to_del:
+        del candidates[cand]
+    candidates = {k: candidates[k] for k in candidates if k not in cands_to_del}
+    return {x[0]: x[1] for x in list(sorted(candidates.items(), key=lambda i: i[1], reverse=True))[:20]}
+
+start = time.time()
+awards_dict = count_scripts()
+print(time.time() - start)
+awards = list(awards_dict.keys())
+
+for award in awards_dict:
+    print(award + ": " + str(awards_dict[award]))
 
 
-awards = count_scripts()
-
-print(awards)
+award_answers = ['cecil b. demille award', 'best motion picture - drama', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best motion picture - comedy or musical', 'best performance by an actress in a motion picture - comedy or musical', 'best performance by an actor in a motion picture - comedy or musical', 'best animated feature film', 'best foreign language film', 'best performance by an actress in a supporting role in a motion picture', 'best performance by an actor in a supporting role in a motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best television series - comedy or musical', 'best performance by an actress in a television series - comedy or musical', 'best performance by an actor in a television series - comedy or musical', 'best mini-series or motion picture made for television', 'best performance by an actress in a mini-series or motion picture made for television', 'best performance by an actor in a mini-series or motion picture made for television', 'best performance by an actress in a supporting role in a series, mini-series or motion picture made for television', 'best performance by an actor in a supporting role in a series, mini-series or motion picture made for television']
 
 
-def comp_to_scripts(tweet):
-    pass
+import sys
+import json
+import difflib
+from pprint import pprint
+from collections import Counter
 
-    # for A, prefer answers that start with "best"
-    # for X, Y, etc., prefer answers that are in the IMDB list (movies or actors)
-    # for scripts without an ending ([X] wins [A], e.g.), add each prefix until the end of the tweet
-    # favor tweets with the word "category" or "award" in them?
-    # bias against golden or golden globe
-
-
-    # win synonyms: collect, secure, procure, earn, acquire, obtain, attain, gain
-   
-
-    # [X] win [A]
-    # [X] wins [A]
-    # [X] won [A]
-    # [X] winning [A]
-    # [X] is winning [A]
-    # [X] are winning [A]
-    # [X] will win [A]
-    # [X] should win [A]
-    # [X] should have won [A]
-
-    # [X] win [A] for [Y]
-    # [X] wins [A] for [Y]
-    # [X] won [A] for [Y]
-    # [X] winning [A] for [Y]
-    # [X] is winning [A] for [Y]
-    # [X] are winning [A] for [Y]
-    # [X] will win [A] for [Y]
-    # [X] should win [A] for [Y]
-    # [X] should have won [A] for [Y]
+from nltk.metrics import edit_distance
 
 
-
-    # [X] get [A]
-    # [X] gets [A]
-    # [X] got [A]
-    # [X] getting [A]
-    # [X] is getting [A]
-    # [X] are getting [A]
-    # [X] will get [A]
-    # [X] should get [A]
-    # [X] should have got [A]
-
-    # [X] get [A] for [Y]
-    # [X] gets [A] for [Y]
-    # [X] got [A] for [Y]
-    # [X] getting [A] for [Y]
-    # [X] is getting [A] for [Y]
-    # [X] are getting [A] for [Y]
-    # [X] will get [A] for [Y]
-    # [X] should get [A] for [Y]
-    # [X] should have got [A] for [Y]
+global toMovie
+toMovie = {'johann johannsson': 'the theory of everything', 'alexandre desplat': 'the imitation game', 'trent reznor and atticus ross': 'gone girl', 'antonio sanchez': 'birdman', 'hans zimmer': 'interstellar', 'glory': 'selma', 'big eyes': 'big eyes', 'mercy is': 'noah', 'opportunity': 'annie', 'yellow flicker beat': 'the hunger games mockingjay part 1', 'alejandro gonzalez inarritu': 'birdman', 'wes anderson': 'the grand budapest hotel', 'gillian flynn': 'gone girl', 'richard linklater': 'boyhood', 'graham moore': 'the imitation game'}
 
 
-
-    # [A] goes to [X]
-    # [A] went to [X]
-    # [A] going to [X]
-    # [A] is going to [X]
-    # [A] will go to [X]
-    # [A] should go to [X]
-    # [A] should have gone to [X]
+def norm_text(textstring):
+    return "".join([c.lower() for c in textstring if c.isalnum() or c.isspace()])
 
 
+def text(resultstr, answerstr):
 
-    # [X] receive [A]
-    # [X] receives [A]
-    # [X] received [A]
-    # [X] receiving [A]
-    # [X] is receiving [A]
-    # [X] are receiving [A]
-    # [X] will receive [A]
-    # [X] should receive [A]
-    # [X] should have received [A]
+    result = resultstr.split()
+    answer = answerstr.split()
 
-    # [X] receive [A] for [Y]
-    # [X] receives [A] for [Y]
-    # [X] received [A] for [Y]
-    # [X] receiving [A] for [Y]
-    # [X] is receiving [A] for [Y]
-    # [X] are receiving [A] for [Y]
-    # [X] will receive [A] for [Y]
-    # [X] should receive [A] for [Y]
-    # [X] should have received [A] for [Y]
+    len_result = len(result)
+    len_answer = len(answer)
+
+    if (resultstr in answerstr) or (answerstr in resultstr):
+        textscore = min(len_result, len_answer)/float(max(len_result, len_answer))
+    else:
+        s = difflib.SequenceMatcher(None, result, answer)
+
+        longest = s.find_longest_match(0, len_result, 0, len_answer)
+        longest = longest.size/float(max(len_result, len_answer))
+
+        if longest > 0.3:
+            matchlen = sum([m[2] for m in s.get_matching_blocks() if m[2] > 1])
+            textscore = float(matchlen)/max(len_result, len_answer)
+        else:
+            textscore = longest
+
+    return textscore
+
+
+def spell_check(r, a, s, scores, weight=1):
+    change = weight*(1-(edit_distance(r, a)/float(max(len(r), len(a)))))
+    if s in scores:
+        # penalty for returning multiple of the same result when
+        # one instance is incorrectly spelled
+        return (scores[s] + change)/2.0
+    else:
+        return change
+
+
+def calc_translation(result, answer):
+
+    resultmap = {norm_text(r): r for r in result}
+    answermap = {norm_text(a): a for a in answer}
+    result = set(resultmap.keys())
+    answer = set(answermap.keys())
+
+    intersection = result.intersection(answer)
+    translation = {resultmap[i]: answermap[i] for i in intersection}
+    scores = dict(list(zip(list(translation.values()), [1]*len(intersection))))
+    score_by_results = {}
+    score_by_answers = {}
+
+    # loop through results that didn't have a perfect match
+    # and get a score for each of them.
+    comp = list(result - intersection)
+
+    for r in comp:
+        score_by_results[r] = Counter()
+        for a in answer:
+            if a not in score_by_answers:
+                score_by_answers[a] = Counter()
+
+            score_by_results[r][a] = text(r, a)
+            score_by_answers[a][r] = score_by_results[r][a]
+
+    for r in score_by_results:
+        cnt = 0
+        ranking = score_by_results[r].most_common()
+        flag = True
+        while flag:
+            # The answer that best matches the result
+            answer_match = ranking[cnt][0]
+            # The top result matching that answer
+            max_result = score_by_answers[answer_match].most_common(1)[0]
+
+            if score_by_results[r][answer_match] < 0.45:
+                bestAnswer = False
+                score = 0
+
+                # Unacceptably low score.
+                # Check if we have a case of returning the movie instead
+                # of the person, or vice versa.
+                for ha in toMovie:
+                    tempScore = text(r, ha)
+                    if tempScore > score:
+                        score = tempScore
+                        bestAnswer = ha
+
+                if bestAnswer and score > 0.45:
+                    translation[resultmap[r]] = toMovie[ha]
+                    scores[toMovie[ha]] = spell_check(r, ha, toMovie[ha], scores, 0.5)
+
+                flag = False
+            elif (max_result[0] == r) or (score_by_results[r][answer_match] > score_by_answers[answer_match][max_result[0]]):
+                # if the top result matching that answer is our current result or
+                # if the current result's score is greater than the previous top result
+                translation[resultmap[r]] = answermap[answer_match]
+                scores[answermap[answer_match]] = spell_check(r, answer_match, answer_match, scores)
+
+                flag = False
+
+            cnt += 1
+            if cnt == len(ranking):
+                flag = False
+
+    if scores:
+        return sum(scores.values())/float(len(scores)), translation
+    else:
+        return 0, translation
+
+
+def calc_score(result, answer):
+    result = set(result)
+    intersection = result.intersection(answer)
+    len_intersection = len(intersection)
+    len_union = len(result.union(answer))
+    len_result = len(result)
+    len_answer = len(answer)
+
+    if len_union == 0:
+        return 0
+    elif len_result == len_answer and len_intersection == len_answer:
+        m = 1.0
+    elif len_intersection == len_result:
+        # all results correspond to a correct answer, but some 
+        # answers are missing
+        m = 0.95
+    elif len_intersection == len_answer:
+        # all answers correspond to a result, but there are
+        # some extra results as well
+        m = 0.9
+    elif len_intersection > 0:
+        # there is some post-translation intersection between
+        # results and answers.
+        m = 0.85
+    else:
+        return 0
+
+    return (len_intersection / float(len_union)) * m
+
+
+i = 20
+# maxx = (0, 0, 0, {})
+# for i in range(18, 53):
+spelling_score, translation = calc_translation(awards[:i], award_answers)
+c_score = calc_score([translation[res] if res in translation else res for res in awards[:i]], award_answers)
+# if c_score > maxx[1]:
+# maxx = (i, c_score, spelling_score, translation)
+
+print(spelling_score)
+print(c_score)
+# print()
+# print(maxx[0])
+# print(maxx[1])
+# print(maxx[2])
+# for t in maxx[3]:
+#     print(t + "  :  " + maxx[3][t])
     
-    
-    
-    # [X] claim [A]
-    # [X] claims [A]
-    # [X] claimed [A]
-    # [X] claiming [A]
-    # [X] is claiming [A]
-    # [X] are claiming [A]
-    # [X] will claim [A]
-    # [X] should claim [A]
-    # [X] should have claimed [A]
-
-    # [X] claim [A] for [Y]
-    # [X] claims [A] for [Y]
-    # [X] claimed [A] for [Y]
-    # [X] claiming [A] for [Y]
-    # [X] is claiming [A] for [Y]
-    # [X] are claiming [A] for [Y]
-    # [X] will claim [A] for [Y]
-    # [X] should claim [A] for [Y]
-    # [X] should have claimed [A] for [Y]
-    
-    
-    
-    # [X] take home [A]
-    # [X] takes home [A]
-    # [X] took home [A]
-    # [X] taking home [A]
-    # [X] is taking home [A]
-    # [X] are taking home [A]
-    # [X] will take home [A]
-    # [X] should take home [A]
-    # [X] should have taken home [A]
-
-    # [X] take home [A] for [Y]
-    # [X] takes home [A] for [Y]
-    # [X] took home [A] for [Y]
-    # [X] taking home [A] for [Y]
-    # [X] is taking home [A] for [Y]
-    # [X] are taking home [A] for [Y]
-    # [X] will take home [A] for [Y]
-    # [X] should take home [A] for [Y]
-    # [X] should have taken home [A] for [Y]
 
 
-
-    # [X] bring home [A]
-    # [X] brings home [A]
-    # [X] brought home [A]
-    # [X] bringing home [A]
-    # [X] is bringing home [A]
-    # [X] are bringing home [A]
-    # [X] will bring home [A]
-    # [X] should bring home [A]
-    # [X] should have brought home [A]
-
-    # [X] bring home [A] for [Y]
-    # [X] brings home [A] for [Y]
-    # [X] brought home [A] for [Y]
-    # [X] bringing home [A] for [Y]
-    # [X] is bringing home [A] for [Y]
-    # [X] are bringing home [A] for [Y]
-    # [X] will bring home [A] for [Y]
-    # [X] should bring home [A] for [Y]
-    # [X] should have brought home [A] for [Y]
-
-
-
-    # [X] present [A]
-    # [X] presents [A]
-    # [X] presented [A]
-    # [X] presenting [A]
-    # [X] is presenting [A]
-    # [X] are presenting [A]
-    # [X] will present [A]
-    # [X] should present [A]
-    # [X] should have presented [A]
-
-    # [X] present [A] to [Y]
-    # [X] presents [A] to [Y]
-    # [X] presented [A] to [Y]
-    # [X] presenting [A] to [Y]
-    # [X] is presenting [A] to [Y]
-    # [X] are presenting [A] to [Y]
-    # [X] will present [A] to [Y]
-    # [X] should present [A] to [Y]
-    # [X] should have presented [A] to [Y]
-
-    # [X] present [A] for [Y]
-    # [X] presents [A] for [Y]
-    # [X] presented [A] for [Y]
-    # [X] presenting [A] for [Y]
-    # [X] is presenting [A] for [Y]
-    # [X] are presenting [A] for [Y]
-    # [X] will present [A] for [Y]
-    # [X] should present [A] for [Y]
-    # [X] should have presented [A] for [Y]
-
-    # [X] present [A] to [Y] for [Z]
-    # [X] presents [A] to [Y] for [Z]
-    # [X] presented [A] to [Y] for [Z]
-    # [X] presenting [A] to [Y] for [Z]
-    # [X] is presenting [A] to [Y] for [Z]
-    # [X] are presenting [A] to [Y] for [Z]
-    # [X] will present [A] to [Y] for [Z]
-    # [X] should present [A] to [Y] for [Z]
-    # [X] should have presented [A] to [Y] for [Z]
-
-
-
-    # nominated for [A]
-    # [X] nominated for [A]
-    # [X] is nominated for [A]
-    # [X] are nominated for [A]
-    # [X] was nominated for [A]
-    # [X] were nominated for [A]
-    # [A] nominee [X]
-
-    # up for [A]
-    # [X] up for [A]
-    # [X] is up for [A]
-    # [X] are up for [A]
-    # [X] was up for [A]
-    # [X] were up for [A]
+# for A, prefer answers that start with "best"
+# for X, Y, etc., prefer answers that are in the IMDB list (movies or actors)
+# for scripts without an ending ([X] wins [A], e.g.), add each prefix until the end of the tweet
+# favor tweets with the word "category" or "award" in them?
+# bias against golden or golden globe
