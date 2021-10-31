@@ -14,6 +14,8 @@ import preprocessor as p
 import spacy
 from spacy.tokenizer import Tokenizer
 from pprint import pprint
+import time
+from difflib import SequenceMatcher
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -48,7 +50,10 @@ YEAR = 2013
 path = os.getcwd()
 # Get parent directory
 path = os.path.abspath(os.path.join(path, os.pardir))
-
+# Tweet Dict
+TWEETS_DICT = {}
+# Tweet List
+TWEETS = []
 # Mappings -- I don't think we're supposed to use dicts anymore, something about named tuples idk. 
 tweet_to_tags = {}
 tweet_to_netree = {}
@@ -57,20 +62,37 @@ name_dict = {}
 # Load and Extract Data
 def extract_data(year):
     print("Extracting Data\n") if DEBUG == 1 else 0
+    # Start Timer
+    timer = time.time()
     # Get path to JSON of specified year
     src_path = '../gg' + str(year) + '.json'
-    # Open
+    # Nested Dict for tweets for current year
+    TWEETS_DICT[str(year)] = {} 
+    # Open file
     with open(src_path, "r") as read_file:
         # Load JSON
-        tweets = json.load(read_file)
-    # Load into DataFrame
-    tweets = pd.json_normalize(tweets)
-    # Carve out hashtags
-    tweets['hashtag'] = tweets['text'].apply(lambda x: re.findall(r"#(\w+)", x))
-    # TESTING PRINT
-    print(len(tweets))
-    # Return DataFrame 
-    return tweets
+        TWEETS = json.load(read_file)
+    # Light preprocessing
+    for tweet in TWEETS:
+        # Dict for individual tweets
+        tweet_dict  = {"text" : [], "clean_text" : [], "entities" : []}
+        # Get unclean text
+        tweet_dict["text"] = tweet["text"]
+        # Light processing
+        tweet_dict["clean_text"] = tweet["text"].lower().strip().split()
+        # Set entities to None for now
+        tweet_dict["entities"] = None
+        # Add to TWEETS_DICT
+        TWEETS_DICT[str(year)]["text"] = tweet_dict
+
+    # # Load into DataFrame
+    # tweets = pd.json_normalize(tweets)
+    # # Carve out hashtags
+    # tweets['hashtag'] = tweets['text'].apply(lambda x: re.findall(r"#(\w+)", x))
+    # # TESTING PRINT
+    # print(len(tweets))
+    # # Return DataFrame 
+    # return tweets
 
 # Tokenization 
 lemmatizer = nltk.stem.WordNetLemmatizer()
@@ -165,15 +187,12 @@ def clean_text(df):
             print(f"Cleaned text is: {clean_text}\n")
             #print(f"Ent list is: {new_ent_list}\n")
 
-
 # Part of Speech Tagging
 def tag_speech(words):
     new_words = nltk.pos_tag(words)
     return new_words
 
-
 # Spacy tokenizes in its nlp function. It takes phrases as strings
-
 # Spacy Part of Speech Tagging
 def spacy_tag_speech(tweet: str):
     doc = nlp(tweet)
@@ -214,12 +233,12 @@ def create_pos_tag_csv(dict, orient, year):
 
 ###### TESTING ######
 # Call Extract data w/ Year to get DataFrame of Tweets w/ hashtags broken into 'hashtags' column
-tweets = extract_data(YEAR)
+#tweets = extract_data(YEAR)
 # Clean the tweets
-clean_text(tweets)
+#clean_text(tweets)
 # Get to MAX_TWEET 
-tweets.head(TWEET_MAX).to_csv('cleaned_tweets_13.csv')
-
+#tweets.head(TWEET_MAX).to_csv('cleaned_tweets_13.csv')
+tweets = pd.read_csv('cleaned_tweets_13.csv')
 # Regexpr Patterns
 award_pattern_pre = re.compile('Best ([A-z\s-]+)[A-Z][a-z]*[^A-z]')
 award_pattern_post = re.compile(".*^((?!(goes|but|is|in|by an|a)).)*$")
@@ -231,9 +250,8 @@ job_type_pattern = re.compile(r"^(?=.*\b(actor|actress|director)\b).*$")
 role_type_pattern = re.compile(r"^(?=.*\b(supporting|support)\b)(?=.*\b(actor|actress)\b).*$")
 
 # Get Tweets
-tweets_list = tweets["clean_text"].head(TWEET_MAX).to_list()
+tweets_list = tweets["clean_text"].head(70000).to_list()
 tweets_list_uncleaned = tweets["text"].head(TWEET_MAX).to_list()
-
 # Filter using regexp
 # Awards
 award_tweets = [award_pattern_pre.search(tweet).group(0)[:-1] for tweet in tweets_list if award_pattern_pre.search(tweet)]

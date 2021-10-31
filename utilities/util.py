@@ -1,3 +1,5 @@
+import re
+
 """
     Single place for resources/utility/constant value import
 
@@ -18,14 +20,15 @@ OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - mu
 # Keywords#
 ###########
 AWARD_KEYWORDS = "best;Best;BEST;award;Award"
+WINNER_KEYWORDS = "win;won;wins;gets;receives;accepts;winner"
 CATEGORY_KEYWORDS = "director;motion picture;actor;actress;cecil"
-HOST_KEYWORDS = "hosting;host;emcee;hosts"
+HOST_KEYWORDS = "hosting;host;hosts"
 NOMINEE_KEYWORDS = "nominee;nominate;nominations;nominated;"
 PRESENTER_KEYWORDS = "presents;presented;presentation;presenting;presenter;presenters;announcer;announced;announce"
 MOTION_PICTURE_DRAMA_KEYWORDS = ""
 # Probably could've scrapped some red carpet reporting on fashion for most frequent positve/negative words with Vader and used those... but time is of the essence. 
-WORST_DRESS = "worst;bad;ugly;terrible;unfashionable;poor;taste"
-BEST_DRESS = "pretty;favorite;interesting;beautiful;stunning;brave;elegant;nice;amazing;outfit;gorgeous"
+WORST_DRESS_KEYWORDS = "worst;bad;ugly;terrible;unfashionable;poor;taste"
+BEST_DRESS_KEYWORDS = "pretty;favorite;interesting;beautiful;stunning;brave;elegant;nice;amazing;outfit;gorgeous"
 ##############
 # Stop Words #
 ##############
@@ -33,3 +36,6 @@ BEST_DRESS = "pretty;favorite;interesting;beautiful;stunning;brave;elegant;nice;
 # Imported from NLTK stopwords.english
 STOP_WORDS = ['than', "isn't", 'weren', 'have', 'what', 'the', 'they', 'more', 'doesn', "mightn't", 'them', 'itself', 'own', 'or', 'you', 'theirs', 'before', 'how', 'were', 'does', 'ma', 'he', 'same', 'each', 'doing', 'at', 'couldn', "needn't", 'but', "weren't", 'only', 'over', 'again', 'any', 'now', 'here', 'no', 'mustn', 're', 'nor', 'so', "she's", 'above', 'against', "didn't", 'myself', 'an', 'ain', 'shouldn', 'where', 'their', 'won', 'yours', 'himself', 'further', 'i', 'this', 'didn', 'these', 'herself', 'both', 'her', 'aren', 'its', 'other', "wouldn't", "shan't", 'all', 'in', 'do', 'with', 'up', 'there', 'our', 'needn', 'such', 'while', 'too', "hasn't", "don't", 'below', 'ourselves', 'to', 've', "couldn't", 'because', 'down', "doesn't", 'is', 'if', 'wouldn', "aren't", 'who', "haven't", 'being', 'then', 'very', "should've", 'should', 'that', 'few', 'hadn', 'under', 'hasn', 'as', 'off', "won't", 'not', 'm', 'hers', 'a', "you've", 'him', 'yourself', 'she', 'on', 't', "hadn't", 'shan', 'of', 'about', 'it', "you're", 'why', 'are', 'through', 'between', 'having', 'whom', 'until', 'and', 'your', 'those', 'me', 'o', 's', 'ours', 'y', 'will', 'my', 'into', 'themselves', 'did', 'be', 'wasn', 'd', 'yourselves', "shouldn't", 'when', 'during', 'isn', "you'd", "wasn't", 'am', "it's", 'by', 'haven', 'been', 'can', "you'll", 'had', 'from', 'most', "that'll", 'don', 'out', 'for', 'after', 'some', 'we', 'his', 'once', 'has', 'was', 'mightn', 'just', 'll', "mustn't", 'which']
 
+###########
+# RegExpr #
+###########

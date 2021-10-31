@@ -1,83 +1,191 @@
-import pandas as pd
-
-# Load Data into CSV
-name_data = pd.read_csv("data.tsv", sep = "\t")
-# Convert to numeric, N/A values should be coerced to NaN
-name_data["birthYear"] = pd.to_numeric(name_data["birthYear"], errors="coerce")
-name_data["deathYear"] = pd.to_numeric(name_data["deathYear"], errors="coerce")
-# Fill death year with a dummy value
-name_data["deathYear"] = name_data["deathYear"].fillna(2050)
-
-# Filter out data that is not useful
-name_data = name_data[name_data["primaryProfession"].notna()]
-name_data = name_data[name_data["birthYear"].notna()]
-name_data = name_data[name_data.deathYear > 2012]
-
-# Separate into actors, actresses
-actor_names = name_data[name_data.primaryProfession.str.contains('actor')]
-actress_names = name_data[name_data.primaryProfession.str.contains('actress')]
-# Print Lens
-print(len(actor_names))
-print(len(actress_names))
-# Print first 30 values
-print(actor_names.head(30))
-print(actress_names.head(30))
-# Output to CSV
-actor_names.to_csv('actor_names.csv')
-actress_names.to_csv('actress_names.csv')
+import time
+import csv
 
 
+def get_names():
+    # Start Timer
+    timer = time.time()
+    # dict for names
+    name_dict = {}
+    # Src Path
+    src_path = 'name_data.tsv'
+    # get name_dict
+    with open(src_path, "r") as f:
+        rd = csv.reader(f, delimiter="\t")
+        # Get Relevant Years
+        for year in range(2012, 2021):
+            name_dict[str(year)] = []
+        # Loop through info
+        for row in rd:
+            # Get relevant fields [name, birthyear, deathyear]
+            primaryName = row[1]
+            birthYear = row[2]
+            deathYear = row[3]
+
+            # Check if nonsense data for birth
+            if (birthYear == "\\N"):
+                # If so, skip
+                continue
+
+            # Check if Alive
+            if (deathYear == "\\N"):
+                # If so, active until 2021
+                active = range(int(birthYear), 2021)
+            else:
+                # If not, active until deathYear
+                active = range(int(birthYear), int(deathYear))
+        
+            # Evidently people can die before they were born, need to check for that BS
+            if active.start > active.stop:
+                # Reincarnation I think not
+                continue
+
+            # Only care about range within our testing suites [2012 - 2020]
+            if active.start < 2012 and active.stop < 2012:
+                # If outside, don't need
+                continue
+        
+            # Reset start year for actors/actresses still active but start was before target year
+            if active.start < 2012:
+                # Set to start 2012
+                active = range(2012, active[-1])
+            # Add actor/actress to dict for each year in which they were active        
+            for year in active:
+                name_dict[str(year)].append(primaryName)
+
+        time_passed = str(time.time() - timer)
+        print(f"Time taken: {time_passed}")
+
+        return name_dict
+
+def get_movies_and_series():
+    # Start Timer
+    timer = time.time()
+    # dict for movies
+    movie_dict = {}
+    genre_movie_dict = {}
+    # dict for series
+    series_dict = {}
+    genre_series_dict = {}
+    # Src Path
+    src_path = 'title_data.tsv'
+    src_path_debug = "/home/yjaden/Courses/337/gg-project/utilities/title_data.tsv"
+    # get name_dict
+    with open(src_path_debug, "r") as f:
+        rd = csv.reader(f, delimiter="\t")
+        # Get Relevant Years
+        for year in range(2012, 2021):
+            series_dict[str(year)] = []
+            movie_dict[str(year)] = []
+            genre_movie_dict[str(year)] = []
+            genre_series_dict[str(year)] = []
+
+        # Loop through info
+        for row in rd:
+            # Skip Adult Films
+            if row[4] == 1:
+                continue 
+
+            # Check if Movie
+            elif row[1] == 'movie':
+                # Movies
+                # Get relevant fields [title, startyear, endyear]
+                primaryTitle = row[2]
+                startYear = row[5]
+                endYear = row[6]
+                genres = row[8]
+
+                # Check if nonsense data for start
+                if (startYear == "\\N"):
+                    # If so, skip
+                    continue
+                # Check if before what we care about
+                if (int(startYear) < 2012):
+                    continue
+                # Check if after what we care about
+                if (int(startYear) > 2020):
+                    continue
+                # Append to movie_dict
+                movie_dict[str(startYear)].append(primaryTitle)  
+            
+                # Check for genre
+                if genres != "\\N":
+                    # Split str into list
+                    genres = genres.split()
+                    # Append list to dict
+                    genre_movie_dict[str(startYear)].append(genres)
+                else:
+                    # Append None
+                    genre_movie_dict[str(year)].append(None)
+
+            # Check if Series
+            elif row[1] == 'tvSeries':
+                # Series
+                # Get relevant fields [title, startyear, endyear]
+                primaryTitle = row[2]
+                startYear = row[5]
+                endYear = row[6]
+                genres = row[8]
+
+                # Check if nonsense data for start
+                if (startYear == "\\N"):
+                    # If so, skip
+                    continue
+
+                # Check if after what we care about
+                if (int(startYear) > 2020):
+                    continue
+
+                # Check if ended
+                if (endYear == "\\N"):
+                    # If so, airing until 2021
+                    active = range(int(startYear), 2021)
+                else:
+                    # If not, aired until endYear
+                    if int(endYear) <= 2020:
+                        # Make sure it's within bounds
+                        active = range(int(startYear), int(endYear))
+                    else:
+                        active = range(int(startYear), 2020)
+        
+                # Evidently people can die before they were born, need to check for that BS
+                if active.start > active.stop:
+                    # Reincarnation I think not
+                    continue
+
+                # Only care about range within our testing suites [2012 - 2020]
+                if active.start < 2012 and active.stop < 2012:
+                    # If outside, don't need
+                    continue
+        
+                # Reset start year for series still active but start was before target year
+                if active.start < 2012:
+                    # Set to start 2012
+                    active = range(2012, active[-1])
+
+                # Check for genres
+                if genres != "\\N":
+                    # Split Genres
+                    genres = genres.split()
+                    # Add the genres for each year show was running
+                    for year in active:
+                        genre_series_dict[str(year)].append(genres)
+                else:
+                    # Otherwise append None
+                    for year in active:
+                        genre_series_dict[str(year)].append(None)
+                       
+                # Add series to dict for each year in which it ran        
+                for year in active:
+                    series_dict[str(year)].append(primaryTitle) 
+
+        time_passed = str(time.time() - timer)
+        print(f"Time taken: {time_passed}")
+
+        return series_dict, movie_dict, genre_series_dict, genre_movie_dict
 
 
+dict1, dict2, dict3, dict4 = get_movies_and_series()
 
-JOB_LIST = ["actor", "actress", "director", "writer"]
-# Load Necessary CSVs
-# Load Actors, Actresses Name data
-name_data_actors = pd.read_csv('actor_names.csv')
-name_data_actresses = pd.read_csv('actress_names.csv')
-# Concata actors, actresses
-frames = [name_data_actors, name_data_actresses]
-name_data = pd.concat(frames)
-# Load Title Data into CSV
-title_data = pd.read_csv('title_data.tsv', sep="\t")
-# Load Title Principal Data
-title_principal_data = pd.read_csv('title_principal_data.tsv', sep="\t")
-
-
-# Adjust to numeric values
-title_data["startYear"] = pd.to_numeric(title_data["startYear"], errors="coerce")
-title_data["endYear"] = pd.to_numeric(title_data["endYear"], errors="coerce")
-title_data["runtimeMinutes"] = pd.to_numeric(title_data["runtimeMinutes"], errors="coerce")
-title_data["isAdult"] = pd.to_numeric(title_data["isAdult"], errors="coerce")
-
-# Filter out data that is not useful
-title_data = title_data[title_data.titleType == 'movie']
-title_data = title_data[title_data.startYear >=  2012]
-title_data = title_data[title_data.startYear < 2015]
-title_data = title_data[title_data.isAdult != 1]
-title_data = title_data[title_data.runtimeMinutes >= 90]
-# Print for confirmation
-print(title_data.head(30))
-print(len(title_data))
-# Load titles into list
-title_list = title_data["tconst"].to_list()
-
-
-# Filter out useless data
-title_principal_data = title_principal_data[title_principal_data.tconst.isin(title_list)]
-title_principal_data = title_principal_data[title_principal_data.category.isin(JOB_LIST)]
-# Print for confirmation
-print(len(title_principal_data))
-print(title_principal_data.dtypes)
-print(title_principal_data.head(30))
-
-# Get actor and actress list of names
-#actor_name_list = name_data_actors["nconst"].to_list()
-#actress_name_list = name_data_actresses["nconst"].to_list()
-# Combine into single list
-name_list_all = name_data["nconst"].to_list() #actor_name_list + actress_name_list
-# Filter Title Principal Data with name data
-title_principal_data = title_principal_data[title_principal_data.nconst.isin(name_list_all)]
-# Print for confirmation
-print(len(title_principal_data))
-print(title_principal_data.head(30))
+print(dict2['2019'][0:20])
+print(dict4['2019'][0:20])
