@@ -9,12 +9,13 @@ import re
 import spacy
 import time
 from difflib import SequenceMatcher
-# nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_sm")
 nltk.download('stopwords')
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
 # Globals
+YEAR = ''
 STOP_WORDS = ["goldenglobes", "golden globes", "Golden", "Hollywood", "RT", "rt", "film", "best", "actress", "actor", "goldenglobe", "musical", "picture", "motion"]
 TWEETS_DICT = {}
 TWEETS_LIST = []
@@ -37,8 +38,6 @@ presenter_pattern = re.compile('present[^a][\w]*\s([\w]+\s){1,5}')
 presenter_pattern_2 = re.compile(r"^(?=.*\b(present.*)\b).*$")
 nominee_pattern = re.compile(r"^(?=.*\b(nomin.*)\b).*$")
 award_type_pattern = re.compile(r"^(?=.*\b(drama|comedy|musical|animated|foreign|screenplay|original|song|score)\b)(?=.*\b(motion|picture|movie|tv|television|series|limited)\b).*$")
-job_type_pattern = re.compile(r"^(?=.*\b(actor|actress|director)\b).*$")
-role_type_pattern = re.compile(r"^(?=.*\b(supporting|support)\b)(?=.*\b(actor|actress)\b).*$")
 
 OFFICIAL_AWARDS_1315 = ['cecil b. demille award', 
                         'best motion picture - drama', 
@@ -147,7 +146,6 @@ def split_award_tweets():
     best_miniseries_tweets = list(filter(lambda x : ('mini-series' in x.lower()), tweets))
     AWARD_TWEETS["mini-series"] = best_miniseries_tweets
     AWARD_TWEETS["series"] = best_miniseries_tweets
-
 
 # Split Presenter Tweets from TWEETS
 def split_presenter_tweets():
@@ -305,8 +303,8 @@ def get_best_dressed(year):
             people = people + persons
     
     people_counter = Counter(people)
-    best_dressed = people_counter.most_common(10)
-    print(best_dressed)
+    best_dressed = people_counter.most_common(1)
+    print(f"Best dressed was {best_dressed}")
     return best_dressed
 
 # Get Worst Dressed
@@ -329,8 +327,8 @@ def get_worst_dressed(year):
             people = people + persons
     
     people_counter = Counter(people)
-    worst_dressed = people_counter.most_common(10)
-    print(worst_dressed)
+    worst_dressed = people_counter.most_common(1)
+    print(f"Worst dressed is {worst_dressed}")
     return worst_dressed
 
 # Get Sentiments
@@ -370,8 +368,8 @@ def get_hosts(year):
             continue
 
     people_counter = Counter(people)
-    two_hosts = people_counter.most_common(10)
-    print(two_hosts)
+    host = people_counter.most_common(1)
+    print(host)
     # Your code here
     #return hosts
 
@@ -495,7 +493,6 @@ def count_scripts():
 def get_awards(year):
     '''Awards is a list of strings. Do NOT change the name
     of this function or what it returns.'''
-    extract_data(year)
     awards = count_scripts()
     return awards
 
@@ -599,7 +596,7 @@ def get_winner(year):
         if flag == "NOUN":
              award_counter = Counter(noun_list)
         # Get most common element
-        winners[award] = award_counter.most_common(5)
+        winners[award] = award_counter.most_common(1)
         print(winners[award])
         count += 1
     # Your code here
@@ -685,6 +682,10 @@ def pre_ceremony():
     Do NOT change the name of this function or what it returns.'''
     # Load Name Data tsv, Extract Data into Dict, text processing?
     # Your code here
+    global YEAR
+    YEAR = input("Please enter a year....")
+    YEAR = str(YEAR)
+    extract_data(YEAR)
     print("Pre-ceremony processing complete.")
     return
 
@@ -695,21 +696,33 @@ def main():
     run when grading. Do NOT change the name of this function or
     what it returns.'''
     # Your code here
+    # Get Year
+    year = YEAR
      # Start Timer
     timer = time.time()
-    extract_data(DEFAULT_YEAR)
+    awards = get_awards(year)
     split_award_tweets()
     split_nominee_tweets()
     split_presenter_tweets()
-    get_hosts(DEFAULT_YEAR)
-    get_best_dressed(DEFAULT_YEAR)
-    get_worst_dressed(DEFAULT_YEAR)
-    get_winner(DEFAULT_YEAR)
-    get_presenters(DEFAULT_YEAR)
+    host = get_hosts(year)
+    get_best_dressed(year)
+    get_worst_dressed(year)
+    winner = get_winner(year)
+    json_dict = {} 
+    json_dict["host"] = host
+    json_dict["awards"] = awards
+    official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    for award in official_awards:
+        json_dict[award] = {}
+        json_dict[award]["Presenters"] = []
+        json_dict[award]["Nominees"] = []
+        json_dict[award]["Winner"] = winner[award]
+    out_file = open("answers.json", "w")
+    json.dump(json_dict, out_file)
     time_passed = str(time.time() - timer)
     print(f"Time taken: {time_passed}")
     return
 
 if __name__ == '__main__':
-    print(get_awards(2013))
-    # main()
+    pre_ceremony()
+    main()
