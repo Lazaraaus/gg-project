@@ -3,8 +3,6 @@ import csv
 
 
 def get_names():
-    # Start Timer
-    timer = time.time()
     # dict for names
     name_dict = {}
     # Src Path
@@ -52,9 +50,6 @@ def get_names():
             # Add actor/actress to dict for each year in which they were active        
             for year in active:
                 name_dict[str(year)].append(primaryName)
-
-        time_passed = str(time.time() - timer)
-        print(f"Time taken: {time_passed}")
 
         return name_dict
 
@@ -183,9 +178,3 @@ def get_movies_and_series():
         print(f"Time taken: {time_passed}")
 
         return series_dict, movie_dict, genre_series_dict, genre_movie_dict
-
-
-dict1, dict2, dict3, dict4 = get_movies_and_series()
-
-print(dict2['2019'][0:20])
-print(dict4['2019'][0:20])
