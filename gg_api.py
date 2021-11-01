@@ -9,14 +9,17 @@ import re
 import spacy
 import time
 from difflib import SequenceMatcher
-nlp = spacy.load("en_core_web_sm")
+# nlp = spacy.load("en_core_web_sm")
 nltk.download('stopwords')
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 # Globals
 STOP_WORDS = ["goldenglobes", "golden globes", "Golden", "Hollywood", "RT", "rt", "film", "best", "actress", "actor", "goldenglobe", "musical", "picture", "motion"]
 TWEETS_DICT = {}
 TWEETS_LIST = []
 TWEETS_CLEAN_LIST = []
+TWEETS_FOR_AWARDS = []
 NAME_DICT = {}
 DEFAULT_YEAR = '2013'
 AWARD_TWEETS = {}
@@ -90,6 +93,23 @@ OFFICIAL_AWARDS_1819 = ['best motion picture - drama',
                         'best performance by an actress in a supporting role in a series, limited series or motion picture made for television', 
                         'best performance by an actor in a supporting role in a series, limited series or motion picture made for television', 
                         'cecil b. demille award']
+
+VERB_PREFIXES = {
+    "wins": 10,
+    "win": 5,
+    "winning": 3,
+    "will win": 1,
+    "receives": 5,
+    "receive": 5,
+    "taking home": 3,
+    "take home": 3,
+    "takes home": 5,
+    "will present": 5,
+    "is nominated for": 3,
+    "presents": 3,
+    "nominated for": 3,
+    "to win": 5
+}
 
 # Split Award Tweets from TWEETS
 def split_award_tweets():
@@ -185,7 +205,7 @@ def get_nouns(tags):
 
 # Load and Extract Data
 def extract_data(year):
-    global TWEETS_DICT, TWEETS_LIST
+    global TWEETS_DICT, TWEETS_LIST, TWEETS_FOR_AWARDS
     # Get path to JSON of specified year
     src_path = 'gg' + str(year) + '.json'
     # Nested Dict for tweets for current year
@@ -210,6 +230,7 @@ def extract_data(year):
         tweet_dict["entities"] = None
         # Add to TWEETS_DICT
         TWEETS_DICT[str(year)][tweet["text"]] = tweet_dict
+        TWEETS_FOR_AWARDS.append(remove_punc_awards(tweet["text"].lower().strip().split()))
 
 # Remove Stopwords
 def remove_stopwords_str(words, stop_words = []):
@@ -322,10 +343,128 @@ def get_hosts(year):
     # Your code here
     #return hosts
 
+# Helpers for get_awards
+
+def remove_punc_awards(words):
+    new_words = []
+    for word in words:
+        if word[0] == "#":
+            continue
+        if len(word) >= 3 and word[:3] == "htt":
+            continue
+        new_word = re.sub(r'[^\w\s]', '', (word))
+        if new_word != '':
+            new_words.append(new_word)
+    return new_words
+
+
+def verb_prefix(tweet):
+    tweet_lsts = []
+    for verbs in VERB_PREFIXES:
+        split_verbs = verbs.split()
+        n = len(split_verbs)
+        indices = [i for (i, w) in enumerate(tweet) if tweet[i:i + n] == split_verbs]
+        if indices:
+            tweet_lsts.append((tweet[indices[-1] + n:], VERB_PREFIXES[verbs]))
+    return tweet_lsts
+
+
+def tweet_lst_to_candidate(cand, val):
+    if cand and (cand[0] == "the" or cand[0] == "a" or cand[0] == "an"):
+        cand = cand[1:]
+    if len(cand) >= 1 and cand[0] in ("goldenglobe", "goldenglobes"):
+        cand = cand[1:]
+    if len(cand) >= 2 and cand[0:2] in (["golden", "globe"], ["golden", "globes"]):
+        cand = cand[2:]
+    if cand and "award" in cand:
+        val += 20
+    if cand and "category" in cand:
+        val += 10
+    if cand and cand[0] == "for":
+        cand = cand[1:]
+        val += 5
+    if cand and cand[0] == "best ":
+        val += 200
+    if cand and cand[0] == "at":
+        cand = cand[1:]
+    if "as" in cand:
+        ind = cand.index("as")
+        cand = cand[:ind]
+        val += 5
+    if "with" in cand:
+        ind = cand.index("with")
+        cand = cand[:ind]
+        val += 5
+    if "at" in cand:
+        ind = cand.index("at")
+        cand = cand[:ind]
+        val += 5
+    if "for" in cand:
+        ind = cand.index("for")
+        cand = cand[:ind]
+        val += 5
+    if "from" in cand:
+        ind = cand.index("from")
+        cand = cand[:ind]
+    if "award" in cand:
+        ind = cand.index("award")
+        cand = cand[:ind]
+    return cand, val
+
+def count_scripts():
+    candidates = {}
+    for tweet in TWEETS_FOR_AWARDS:
+        tweet_sublists = verb_prefix(tweet)
+        for tweet_sublist, val in tweet_sublists:
+            tweet_sublists2 = verb_prefix(tweet_sublist)
+            if tweet_sublists2:
+                tweet_sublists.extend(tweet_sublists2)
+            else:
+                cand, val = tweet_lst_to_candidate(tweet_sublist, val)
+                n = len(cand)
+                cand = " ".join(cand)
+                val += 5 * n
+                if cand in candidates:
+                    candidates[cand] += val
+                else:
+                    candidates[cand] = val
+    candidates = {x[0]: x[1] for x in list(sorted(candidates.items(), key=lambda i: i[1], reverse=True))}
+    candidates_lst = list(candidates.keys())
+    max_val = candidates[candidates_lst[0]]
+    candidates = {k: v for (k, v) in candidates.items() if v > (max_val / 100)}
+    cands_to_del = set()
+    for i in range(len(candidates)):
+        cand_i = candidates_lst[i]
+        for j in range(len(candidates)):
+            if i < j:
+                cand_j = candidates_lst[j]
+                n_i, n_j = len(cand_i.strip().split()), len(cand_j.strip().split())
+                if fuzz.token_sort_ratio(cand_i, cand_j) >= 97 or fuzz.token_set_ratio(candidates_lst[i], candidates_lst[j]) >= 95:
+                    if cands_to_del and n_i >= 4 and candidates[cand_i] > candidates[cand_j]:
+                        candidates[cand_i] += candidates[cand_j]
+                        cands_to_del.add(cand_j)
+                    elif n_j >= 4 and candidates[cand_j] > candidates[cand_i]:
+                        candidates[cand_j] += candidates[cand_i]
+                        cands_to_del.add(cand_i)
+                    else:
+                        if n_i > n_j:
+                            candidates[cand_i] += candidates[cand_j] // 2
+                            cands_to_del.add(cand_j)
+                        else:
+                            candidates[cand_j] += candidates[cand_i] // 2
+                            cands_to_del.add(cand_i)
+        if n_i < 4 or "golden globe" in cand_i or "golden globes" in cand_i or "award" in cand_i or "awards" in cand_i or "gg" in cand_i:
+            cands_to_del.add(cand_i)
+    for cand in cands_to_del:
+        del candidates[cand]
+    candidates = {k: candidates[k] for k in candidates if k not in cands_to_del}
+    return [x[0] for x in list(sorted(candidates.items(), key=lambda i: i[1], reverse=True))[:20]]
+
 def get_awards(year):
     '''Awards is a list of strings. Do NOT change the name
     of this function or what it returns.'''
-    # Your code here
+    extract_data(year)
+    awards = count_scripts()
     return awards
 
 def get_nominees(year):
@@ -475,4 +614,5 @@ def main():
     return
 
 if __name__ == '__main__':
-    main()
+    print(get_awards(2013))
+    # main()
