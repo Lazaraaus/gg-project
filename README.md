@@ -17,3 +17,6 @@ OUR REPOS
 We switched our github repo near the end because we wanted to enable large file sharing
 Original github repo: https://github.com/Lazaraaus/gg-project-master
 LFS github repo: https://github.com/Lazaraaus/gg-project
+
+1.) Install from requirements.txt
+2.) In terminal, run: python -m spacy download en_core_web_sm. If using a virtual env remember to run within virtual environ

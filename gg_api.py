@@ -369,7 +369,6 @@ def get_hosts(year):
 
     people_counter = Counter(people)
     host = people_counter.most_common(1)
-    print(host)
     # Your code here
     #return hosts
 
@@ -518,58 +517,35 @@ def get_winner(year):
     flag = ''
     # Loop through awards
     for award in official_awards:
-        # Flags
-        series = False
-        supporting = False
         # List of people
         people = []
         # List of nouns
         noun_list = []
         # Get award keywords
         award_keywords = award.split() 
-        # if 'series' in award_keywords:
-        #     series = True
-        # if 'supporting' in award_keywords:
-        #     supporting = True
-        print(award_keywords)
         # Super HACKY
         award_tweets_key = award_keywords[TOKEN_AWARD_1[count]] if int(year) < 2016 else award_keywords[TOKEN_AWARD_2[count]]
         award_keywords = remove_stopwords_lst(award_keywords)
         # Check if looking for Noun or Person
         if any(word in award_keywords for word in PERSON_WORDS):
             flag = 'PERSON'
-            if series == True:
-                award_keywords.append('series')
-            if supporting == True:
-                award_keywords.append('supporting')
-            print("Made it to PERSON")
             for tweet in AWARD_TWEETS[award_tweets_key]:
                 text = tweet
                 # Get text
                 text.replace('\d+', '')
                 text = re.sub(r'\w*\d+\w*', '',text)
                 text = re.sub(r'[^\w\s]', '',text)
-                #clean_text = TWEETS_DICT[str(year)][tweet]["clean_text"]
                 # Check for keywords
                 if any(word in text.lower() for word in award_keywords):
                     # If so,
                     entities = spacy_tag_entity(text)
                     persons = get_people_from_ents(entities)
                     persons = remove_stopwords_lst(persons, stop_words = STOP_WORDS)
-                    # if 'best' in persons:
-                    #     persons.remove('best')
-                    # if 'goldenglobes' in persons:
-                    #     persons.remove('goldenglobes')
                     if award_tweets_key in persons:
                         persons.remove(award_tweets_key)
                     people = people + persons
         else:
-            # if series == True:
-            #     award_keywords.append('series')
-            # if supporting == True:
-            #     award_keywords.append('supporting')
             flag = 'NOUN'
-            print("Made it to NOUN")
             # Loop through tweets
             for tweet in AWARD_TWEETS[award_tweets_key]:
 
@@ -578,7 +554,6 @@ def get_winner(year):
                 text.replace('\d+', '')
                 text = re.sub(r'\w*\d+\w*', '',text)
                 text = re.sub(r'[^\w\s]', '',text)
-                #clean_text = TWEETS_DICT[str(year)][tweet]["clean_text"]
                 # Check for keywords
                 if any(word in text.lower() for word in award_keywords):
                     # If so,
@@ -597,7 +572,6 @@ def get_winner(year):
              award_counter = Counter(noun_list)
         # Get most common element
         winners[award] = award_counter.most_common(1)
-        print(winners[award])
         count += 1
     # Your code here
     return winners

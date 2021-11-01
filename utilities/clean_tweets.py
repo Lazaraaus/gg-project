@@ -246,8 +246,6 @@ presenter_pattern = re.compile('present[^a][\w]*\s([\w]+\s){1,5}')
 presenter_pattern_2 = re.compile(r"^(?=.*\b(present.*)\b).*$")
 nominee_pattern = re.compile(r"^(?=.*\b(nomin.*)\b).*$")
 award_type_pattern = re.compile(r"^(?=.*\b(drama|comedy|musical|animated|foreign|screenplay|original|song|score)\b)(?=.*\b(motion|picture|movie|tv|television|series|limited)\b).*$")
-job_type_pattern = re.compile(r"^(?=.*\b(actor|actress|director)\b).*$")
-role_type_pattern = re.compile(r"^(?=.*\b(supporting|support)\b)(?=.*\b(actor|actress)\b).*$")
 
 # Get Tweets
 tweets_list = tweets["clean_text"].head(70000).to_list()
@@ -301,7 +299,6 @@ best_drama_tweets_2 = list(filter(lambda x : ('drama' in x.lower()), award_tweet
 best_director_tweets_2 = list(filter(lambda x : ('director' in x.lower()), award_tweets_3))
 best_screenplay_tweets_2 = list(filter(lambda x : ('screenplay' in x.lower()), award_tweets_3))
 # Animated | Foreign | Score | Song
-best_animated_tweets = list(filter(lambda x : ('animated' in x.lower()), award_tweets_3))
 best_animated_tweets_2 = list(filter(lambda x : ('animated' in x.lower()), award_tweets_2))
 best_foreign_tweets = list(filter(lambda x : ('foreign' in x.lower()), award_tweets_3))
 best_foreign_tweets_2 = list(filter(lambda x : ('foreign' in x.lower()), award_tweets_2))
