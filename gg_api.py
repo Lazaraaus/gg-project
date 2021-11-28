@@ -270,7 +270,6 @@ def remove_stopwords_str(words, stop_words = []):
         new_words = list(filter(lambda x: (x not in stop_words), list_words))
         new_words = " ".join(new_words)
     else:
-        stop_words = set(stopwords.words('english'))
         list_words = words.split()
         new_words = list(filter(lambda x: (x not in stop_words), list_words))
         new_words = " ".join(new_words)
@@ -340,21 +339,21 @@ def get_hosts(year):
     # Get Relevant Keywords
     keywords = HOST_KEYWORDS.split(";")
     badwords = ["should host", "next year", "could host", "next", "should've", "could've", "could have", "should have"]
-    if year == '2013':
-        stop = 15000
-    else:
-        stop = -1
-    # List of people
+    # if year == '2013':
+    #     stop = 15000
+    # else:
+    #     stop = -1
+    # # List of people
     people = []
     # Loop through tweets
-    for tweet in TWEETS_LIST[0:stop]:
+    for tweet in TWEETS_LIST:#[0:stop]:
         # Get text
         clean_text = TWEETS_DICT[str(year)][tweet]["clean_text"]
         # Check for bad words
         if any(word in clean_text.lower() for word in badwords):
             continue
         # Check for keywords
-        if any(word in clean_text.lower() for word in keywords):#'host' in clean_text: #any(word in tweet for word in keywords):
+        elif any(word in clean_text.lower() for word in keywords):#'host' in clean_text: #any(word in tweet for word in keywords):
             # If so, 
             entities = spacy_tag_entity(clean_text)
             #print(entities)
@@ -368,9 +367,9 @@ def get_hosts(year):
             continue
 
     people_counter = Counter(people)
-    host = people_counter.most_common(1)
+    host = people_counter.most_common(2)
     # Your code here
-    #return hosts
+    return host
 
 # Helpers for get_awards
 
@@ -386,7 +385,6 @@ def remove_punc_awards(words):
             new_words.append(new_word)
     return new_words
 
-
 def verb_prefix(tweet):
     tweet_lsts = []
     for verbs in VERB_PREFIXES:
@@ -396,7 +394,6 @@ def verb_prefix(tweet):
         if indices:
             tweet_lsts.append((tweet[indices[-1] + n:], VERB_PREFIXES[verbs]))
     return tweet_lsts
-
 
 def tweet_lst_to_candidate(cand, val):
     if cand and (cand[0] == "the" or cand[0] == "a" or cand[0] == "an"):
@@ -500,6 +497,7 @@ def get_nominees(year):
     names as keys, and each entry a list of strings. Do NOT change
     the name of this function or what it returns.'''
     # Your code here
+    nominees = {}
     return nominees
 
 def get_winner(year):
@@ -580,73 +578,74 @@ def get_presenters(year):
     # '''Presenters is a dictionary with the hard coded award
     # names as keys, and each entry a list of strings. Do NOT change the
     # name of this function or what it returns.'''
-    # keywords = PRESENTER_KEYWORDS.split(";")
-    # count = 0
-    # # Get awards
-    # official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
-    # # Winner Dict from Awards
-    # # Initialize values as an empty str
-    # presenters = dict.fromkeys(official_awards, "")
-    # flag = ''
-    # # Loop through awards
-    # for award in official_awards:
-    #     # List of people
-    #     people = []
-    #     # List of nouns
-    #     noun_list = []
-    #     # Get award keywords
-    #     award_keywords = award.split() 
-    #     print(award_keywords)
-    #     # Super HACKY
-    #     award_tweets_key = award_keywords[TOKEN_AWARD_1[count]] if int(year) < 2016 else award_keywords[TOKEN_AWARD_2[count]]
-    #     award_keywords = remove_stopwords_lst(award_keywords)
-    #     # Check if looking for Noun or Person
-    #     if any(word in award_keywords for word in PERSON_WORDS):
-    #         flag = 'PERSON'
-    #         for tweet in AWARD_TWEETS[award_tweets_key]:
-    #             text = tweet
-    #             # Get text
-    #             text.replace('\d+', '')
-    #             text = re.sub(r'\w*\d+\w*', '',text)
-    #             text = re.sub(r'[^\w\s]', '',text)
-    #             # Check for keywords
-    #             if any(word in text.lower() for word in award_keywords):
-    #                 # If so,
-    #                 entities = spacy_tag_entity(text)
-    #                 persons = get_people_from_ents(entities)
-    #                 persons = remove_stopwords_lst(persons, stop_words = STOP_WORDS)
-    #                 if award_tweets_key in persons:
-    #                     persons.remove(award_tweets_key)
-    #                 people = people + persons
-    #     else:
-    #         flag = 'NOUN'
-    #         # Loop through tweets
-    #         for tweet in AWARD_TWEETS[award_tweets_key]:
-    #             text = tweet
-    #             # Get text
-    #             text.replace('\d+', '')
-    #             text = re.sub(r'\w*\d+\w*', '',text)
-    #             text = re.sub(r'[^\w\s]', '',text)
-    #             # Check for keywords
-    #             if any(word in text.lower() for word in award_keywords):
-    #                 # If so,
-    #                 tags = spacy_tag_speech(text)
-    #                 #proper_nouns = get_proper_nouns(tags)
-    #                 nouns = get_proper_nouns(tags)
-    #                 if (type(nouns) != type(None)):
-    #                     nouns = remove_stopwords_lst(nouns, stop_words=STOP_WORDS)
-    #                     if award_tweets_key in nouns:
-    #                         nouns.remove(award_tweets_key)
-    #                     noun_list = noun_list + nouns
-    #     # Get Counter        
-    #     if flag == "PERSON":
-    #         award_counter = Counter(people) 
-    #     if flag == "NOUN":
-    #          award_counter = Counter(noun_list)
-    #     # Get most common element
-    #     presenters[award] = award_counter.most_common(2)
-    #     print(presenters[award])
-    #     count += 1
+    keywords = PRESENTER_KEYWORDS.split(";")
+    count = 0
+    # Get awards
+    official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    # Winner Dict from Awards
+    # Initialize values as an empty str
+    presenters = dict.fromkeys(official_awards, "")
+    flag = ''
+    # Loop through awards
+    for award in official_awards:
+        # List of people
+        people = []
+        # List of nouns
+        noun_list = []
+        # Get award keywords
+        award_keywords = award.split() 
+        #print(award_keywords)
+        # Super HACKY
+        award_tweets_key = award_keywords[TOKEN_AWARD_1[count]] if int(year) < 2016 else award_keywords[TOKEN_AWARD_2[count]]
+        award_keywords = remove_stopwords_lst(award_keywords)
+        # Check if looking for Noun or Person
+        if any(word in award_keywords for word in PERSON_WORDS):
+            flag = 'PERSON'
+            for tweet in AWARD_TWEETS[award_tweets_key]:
+                text = tweet
+                # Get text
+                text.replace('\d+', '')
+                text = re.sub(r'\w*\d+\w*', '',text)
+                text = re.sub(r'[^\w\s]', '',text)
+                # Check for keywords
+                if any(word in text.lower() for word in award_keywords):
+                    # If so,
+                    entities = spacy_tag_entity(text)
+                    persons = get_people_from_ents(entities)
+                    persons = remove_stopwords_lst(persons, stop_words = STOP_WORDS)
+                    if award_tweets_key in persons:
+                        persons.remove(award_tweets_key)
+                    people = people + persons
+        else:
+            flag = 'NOUN'
+            # Loop through tweets
+            for tweet in AWARD_TWEETS[award_tweets_key]:
+                text = tweet
+                # Get text
+                text.replace('\d+', '')
+                text = re.sub(r'\w*\d+\w*', '',text)
+                text = re.sub(r'[^\w\s]', '',text)
+                # Check for keywords
+                if any(word in text.lower() for word in award_keywords):
+                    # If so,
+                    tags = spacy_tag_speech(text)
+                    #proper_nouns = get_proper_nouns(tags)
+                    nouns = get_proper_nouns(tags)
+                    if (type(nouns) != type(None)):
+                        nouns = remove_stopwords_lst(nouns, stop_words=STOP_WORDS)
+                        if award_tweets_key in nouns:
+                            nouns.remove(award_tweets_key)
+                        noun_list = noun_list + nouns
+        # Get Counter        
+        if flag == "PERSON":
+            award_counter = Counter(people) 
+        if flag == "NOUN":
+             award_counter = Counter(noun_list)
+        # Get most common element
+        presenters[award] = award_counter.most_common(4)
+        print(presenters[award])
+        count += 1
+    #presenters = {}
     return presenters
 
 def pre_ceremony():
@@ -682,13 +681,14 @@ def main():
     get_best_dressed(year)
     get_worst_dressed(year)
     winner = get_winner(year)
+    presenter = get_presenters(year)
     json_dict = {} 
     json_dict["host"] = host
     json_dict["awards"] = awards
     official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
     for award in official_awards:
         json_dict[award] = {}
-        json_dict[award]["Presenters"] = []
+        json_dict[award]["Presenters"] = presenter[award]
         json_dict[award]["Nominees"] = []
         json_dict[award]["Winner"] = winner[award]
     out_file = open("answers.json", "w")
