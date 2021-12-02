@@ -302,8 +302,9 @@ def get_best_dressed(year):
             people = people + persons
     
     people_counter = Counter(people)
-    best_dressed = people_counter.most_common(1)
-    print(f"Best dressed was {best_dressed}")
+    best_dressed = people_counter.most_common(1)[0][0]
+    # print(f"Best dressed was {best_dressed}")
+    print("Best Dressed:", best_dressed)
     return best_dressed
 
 # Get Worst Dressed
@@ -326,8 +327,9 @@ def get_worst_dressed(year):
             people = people + persons
     
     people_counter = Counter(people)
-    worst_dressed = people_counter.most_common(1)
-    print(f"Worst dressed is {worst_dressed}")
+    worst_dressed = people_counter.most_common(1)[0][0]
+    print("Worst Dressed:", worst_dressed)
+    # print(f"Worst dressed is {worst_dressed}")
     return worst_dressed
 
 # Get Sentiments
@@ -335,6 +337,12 @@ def get_worst_dressed(year):
 def get_hosts(year):
     '''Hosts is a list of one or more strings. Do NOT change the name
     of this function or what it returns.'''
+    with open("results" + str(year) + ".json", "r") as f:
+        d = json.load(f)
+    awards = d["Host"]
+    return awards
+
+def prep_hosts(year):
     #global HOST_TWEETS, TWEETS_LIST
     # Get Relevant Keywords
     keywords = HOST_KEYWORDS.split(";")
@@ -367,7 +375,7 @@ def get_hosts(year):
             continue
 
     people_counter = Counter(people)
-    host = people_counter.most_common(2)
+    host = [i[0] for i in people_counter.most_common(2)]
     # Your code here
     return host
 
@@ -437,7 +445,7 @@ def tweet_lst_to_candidate(cand, val):
         cand = cand[:ind]
     return cand, val
 
-def count_scripts():
+def prep_awards():
     candidates = {}
     for tweet in TWEETS_FOR_AWARDS:
         tweet_sublists = verb_prefix(tweet)
@@ -489,18 +497,32 @@ def count_scripts():
 def get_awards(year):
     '''Awards is a list of strings. Do NOT change the name
     of this function or what it returns.'''
-    awards = count_scripts()
+    with open("results" + str(year) + ".json", "r") as f:
+        d = json.load(f)
+    awards = d["Awards"]
     return awards
 
 def get_nominees(year):
     '''Nominees is a dictionary with the hard coded award
     names as keys, and each entry a list of strings. Do NOT change
     the name of this function or what it returns.'''
-    # Your code here
-    nominees = {}
+    with open("results" + str(year) + ".json", "r") as f:
+        d = json.load(f)
+    official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    nominees = {k: d[k]["Nominees"] for k in d if k in official_awards}
     return nominees
 
 def get_winner(year):
+    '''Winners is a dictionary with the hard coded award
+    names as keys, and each entry containing a single string.
+    Do NOT change the name of this function or what it returns.'''
+    with open("results" + str(year) + ".json", "r") as f:
+        d = json.load(f)
+    official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    winner = {k: d[k]["Winner"] for k in d if k in official_awards}
+    return winner
+
+def prep_winner(year):
     '''Winners is a dictionary with the hard coded award
     names as keys, and each entry containing a single string.
     Do NOT change the name of this function or what it returns.'''
@@ -569,15 +591,22 @@ def get_winner(year):
         if flag == "NOUN":
              award_counter = Counter(noun_list)
         # Get most common element
-        winners[award] = award_counter.most_common(1)
+        winners[award] = award_counter.most_common(1)[0][0]
         count += 1
     # Your code here
     return winners
 
 def get_presenters(year):
-    # '''Presenters is a dictionary with the hard coded award
-    # names as keys, and each entry a list of strings. Do NOT change the
-    # name of this function or what it returns.'''
+    '''Presenters is a dictionary with the hard coded award
+    names as keys, and each entry a list of strings. Do NOT change the
+    name of this function or what it returns.'''
+    with open("results" + str(year) + ".json", "r") as f:
+        d = json.load(f)
+    official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    presenters = {k: d[k]["Presenters"] for k in d if k in official_awards}
+    return presenters
+
+def prep_presenters(year):
     keywords = PRESENTER_KEYWORDS.split(";")
     count = 0
     # Get awards
@@ -642,8 +671,8 @@ def get_presenters(year):
         if flag == "NOUN":
              award_counter = Counter(noun_list)
         # Get most common element
-        presenters[award] = award_counter.most_common(4)
-        print(presenters[award])
+        presenters[award] = [i[0] for i in award_counter.most_common(4)]
+        # print(presenters[award])
         count += 1
     #presenters = {}
     return presenters
@@ -673,25 +702,25 @@ def main():
     year = YEAR
      # Start Timer
     timer = time.time()
-    awards = get_awards(year)
+    awards = prep_awards()
     split_award_tweets()
     split_nominee_tweets()
     split_presenter_tweets()
-    host = get_hosts(year)
+    host = prep_hosts(year)
     get_best_dressed(year)
     get_worst_dressed(year)
-    winner = get_winner(year)
-    presenter = get_presenters(year)
+    winner = prep_winner(year)
+    presenter = prep_presenters(year)
     json_dict = {} 
-    json_dict["host"] = host
-    json_dict["awards"] = awards
+    json_dict["Host"] = host
+    json_dict["Awards"] = awards
     official_awards = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
     for award in official_awards:
         json_dict[award] = {}
         json_dict[award]["Presenters"] = presenter[award]
         json_dict[award]["Nominees"] = []
         json_dict[award]["Winner"] = winner[award]
-    out_file = open("answers.json", "w")
+    out_file = open("results" + str(year) + ".json", "w")
     json.dump(json_dict, out_file)
     time_passed = str(time.time() - timer)
     print(f"Time taken: {time_passed}")
